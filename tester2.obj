@@ -1,0 +1,4 @@
+2 1 0 0    # Header (2 text, 1 data, 0 symbols, 0 relocation)
+0x00000001 # start: add 0 0 1
+0x00000000 # halt
+0x00000003 # some_data: .fill 3

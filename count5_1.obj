@@ -1,9 +1,9 @@
-3 2 1 2
-0x00820003
+3 2 1 2                 (Header)
+0x00820003              (Text)
 0x000A0001
 0x017E0000
-0xFFFFFFFF
+0xFFFFFFFF              (Data)
 0x00000000
-SubAdr D 1
-0 lw neg1
+SubAdr D 1              (Symbol Table)
+0 lw neg1               (Relocation Table)
 1 .fill subOne

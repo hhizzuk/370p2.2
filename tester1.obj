@@ -1,0 +1,8 @@
+2 3 0 2    # Header (2 text, 3 data, 0 symbols, 2 relocation)
+0x00810006 # lw 0 1 data1
+0x00000000 # halt
+0x00000002 # data1: .fill end
+0x00000005 # middle: .fill 5
+0x00000000 # end: .fill 0
+1 lw data1    # Relocation for lw instruction
+2 .fill end   # Relocation for data1 referencing end
