@@ -1,2 +1,2 @@
-add 1 2 3    # Add registers 2 and 3, store in register 1
-.fill 10     # Data section for global usage
+sub1    add     1       1       1       ; double input
+        jalr    7       4               ; return

@@ -1,4 +1,6 @@
-lw 0 1 target   # Load target address from label 'target'
-beq 0 1 done    # Branch to 'done' if 0 == 1
-halt            # Stop program
-target .fill 10
+        lw      0       5       Start   ; initialize stack pointer
+        lw      0       4       Func    ; load function address
+        jalr    4       7               ; call function
+        halt
+Start   .fill   Stack                   ; Stack reference
+Func    .fill   func   

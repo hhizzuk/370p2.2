@@ -1,7 +1,7 @@
         lw      0       1       n           ; load n into r1
-        lw      0       4       Faddr       ; load function address
+        lw      0       4       Faddr       ; load function address into r4
         jalr    4       7                   ; call fibonacci
-        halt
+        halt                                ; end of program
 fib     lw      0       6       pos1        ; r6 = 1 for stack operations
         sw      5       7       Stack       ; save return address
         add     5       6       5           ; increment stack pointer
@@ -10,15 +10,15 @@ fib     lw      0       6       pos1        ; r6 = 1 for stack operations
         beq     0       1       ret0        ; if n=0, return 0
         lw      0       4       pos1        ; load 1 into r4
         beq     1       4       ret1        ; if n=1, return 1
-        lw      0       6       neg1        ; load -1
-        add     1       6       1           ; n = n-1
-        lw      0       4       Faddr       ; prepare for recursive call
+        lw      0       6       neg1        ; load -1 into r6
+        add     1       6       1           ; n = n - 1
+        lw      0       4       Faddr       ; load function address again for recursion
         jalr    4       7                   ; call fibonacci(n-1)
         sw      5       3       Stack       ; save result of fib(n-1)
         add     5       6       5           ; increment stack pointer
         lw      5       1       Stack       ; restore original n
-        lw      0       6       neg2        ; load -2
-        add     1       6       1           ; n = n-2
+        lw      0       6       neg2        ; load -2 into r6
+        add     1       6       1           ; n = n - 2
         lw      0       4       Faddr       ; prepare for recursive call
         jalr    4       7                   ; call fibonacci(n-2)
         lw      0       6       neg1        ; prepare to pop stack
@@ -35,9 +35,10 @@ ret0    lw      0       3       zero        ; return 0
         beq     0       0       clean       ; goto cleanup
 ret1    lw      0       3       pos1        ; return 1
         beq     0       0       clean       ; goto cleanup
-n       .fill   7
-Faddr   .fill   fib
-pos1    .fill   1
-neg1    .fill   -1
-neg2    .fill   -2
-zero    .fill   0
+n       .fill   7                           ; input value for fibonacci(n)
+Faddr   .fill   fib                         ; address of fibonacci function
+pos1    .fill   1                           ; constant 1
+neg1    .fill   -1                          ; constant -1
+neg2    .fill   -2                          ; constant -2
+zero    .fill   0                           ; constant 0
+Stack   .fill   0                           ; stack starts here
