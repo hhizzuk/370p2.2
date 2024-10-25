@@ -1,3 +1,12 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#define MAXSIZE 300
+#define MAXLINELENGTH 1000
+#define MAXFILES 6
+
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -58,7 +67,6 @@ int findGlobals(FileData files[MAXFILES], int, int, char *);
 void assignStarts(FileData files[MAXFILES], int);
 int convert(FileData files[MAXFILES], int, int, int);
 int parseHex(char *line);
-int handleBeqOffset(FileData *files, int currentFile, int currentOffset, char *targetLabel);
 
 int totalSize = 0;
 
@@ -110,6 +118,7 @@ int main(int argc, char *argv[]) {
         // Read text section
         for (j = 0; j < sizeText; j++) {
             fgets(line, MAXLINELENGTH, inFilePtr);
+            // Remove newline if present
             line[strcspn(line, "\n")] = 0;
             if (strncmp(line, "0x", 2) == 0) {
                 files[i].text[j] = parseHex(line);
@@ -122,6 +131,7 @@ int main(int argc, char *argv[]) {
         // Read data section
         for (j = 0; j < sizeData; j++) {
             fgets(line, MAXLINELENGTH, inFilePtr);
+            // Remove newline if present
             line[strcspn(line, "\n")] = 0;
             if (strncmp(line, "0x", 2) == 0) {
                 files[i].data[j] = parseHex(line);
@@ -141,6 +151,7 @@ int main(int argc, char *argv[]) {
             strcpy(files[i].symbolTable[j].label, label);
             files[i].symbolTable[j].location = type;
             
+            // Check for Stack label definition
             if (!strcmp("Stack", label) && type != 'U') {
                 printf("error: Stack label defined in input file\n");
                 exit(1);
@@ -206,85 +217,50 @@ int parseHex(char *line) {
     return (int)value;
 }
 
-int handleBeqOffset(FileData *files, int currentFile, int currentOffset, char *targetLabel) {
-    int targetAddr;
-    
-    if (isUpper(targetLabel)) {
-        // Global label
-        targetAddr = findGlobals(files, currentFile, currentFile, targetLabel);
-    } else {
-        // Local label - need to find in current file's symbol table
-        for (int i = 0; i < files[currentFile].symbolTableSize; i++) {
-            if (!strcmp(files[currentFile].symbolTable[i].label, targetLabel)) {
-                targetAddr = files[currentFile].symbolTable[i].offset;
-                if (files[currentFile].symbolTable[i].location == 'T') {
-                    targetAddr += files[currentFile].textStartingLine;
-                }
-                break;
-            }
-        }
-    }
-    
-    // Calculate relative offset: target - (current + 1)
-    int relativeOffset = targetAddr - (currentOffset + files[currentFile].textStartingLine + 1);
-    return relativeOffset & 0xFFFF; // Ensure 16-bit offset
-}
-
 void fixLocal(FileData *files, int argc) {
     for (int i = 0; i < argc - 2; i++) {
         for (int j = 0; j < files[i].relocationTableSize; j++) {
-            int index = files[i].text[files[i].relocTable[j].offset];
-            
-            if (!strcmp(files[i].relocTable[j].inst, "beq")) {
-                // Handle beq instructions
-                int newOffset = handleBeqOffset(files, i, files[i].relocTable[j].offset, 
-                                              files[i].relocTable[j].label);
-                files[i].text[files[i].relocTable[j].offset] = 
-                    (files[i].text[files[i].relocTable[j].offset] & 0xFFFF0000) | newOffset;
-            }
-            else if ((!strcmp(files[i].relocTable[j].inst, "lw")) || 
-                     (!strcmp(files[i].relocTable[j].inst, "sw"))) {
+            if ((!strcmp(files[i].relocTable[j].inst, "lw")) || (!strcmp(files[i].relocTable[j].inst, "sw"))) {
+                int index = files[i].text[files[i].relocTable[j].offset];
+                
                 if (isUpper(files[i].relocTable[j].label)) {
-                    int temp = findGlobals(files, i, argc - 2, files[i].relocTable[j].label);
+                    // Handle global labels
                     if (!strcmp(files[i].relocTable[j].label, "Stack")) {
-                        files[i].text[files[i].relocTable[j].offset] = 
-                            convert(files, argc - 2, totalSize + temp, index);
+                        int temp = findGlobals(files, i, argc - 2, files[i].relocTable[j].label);
+                        files[i].text[files[i].relocTable[j].offset] = convert(files, argc - 2, totalSize + temp, index);
                     } else {
-                        files[i].text[files[i].relocTable[j].offset] = 
-                            convert(files, argc - 2, temp, index);
+                        int temp = findGlobals(files, i, argc - 2, files[i].relocTable[j].label);
+                        files[i].text[files[i].relocTable[j].offset] = convert(files, argc - 2, temp, index);
                     }
                 } else {
+                    // Handle local labels
                     int temp = findOrigOffset(index);
                     int size = findSizes(files, i, argc - 2);
-                    files[i].text[files[i].relocTable[j].offset] = 
-                        convert(files, argc - 2, temp + size, index);
+                    files[i].text[files[i].relocTable[j].offset] = convert(files, argc - 2, temp + size, index);
                 }
-            } 
-            else if (!strcmp(files[i].relocTable[j].inst, ".fill")) {
+            } else if (!strcmp(files[i].relocTable[j].inst, ".fill")) {
                 if (isUpper(files[i].relocTable[j].label)) {
+                    // Handle global labels in data section
                     if (!strcmp(files[i].relocTable[j].label, "Stack")) {
                         files[i].data[files[i].relocTable[j].offset] = totalSize;
                     } else {
                         int temp = findGlobals(files, i, argc - 2, files[i].relocTable[j].label);
-                        // Adjust offset based on section
-                        for (int k = 0; k < files[i].symbolTableSize; k++) {
-                            if (!strcmp(files[i].symbolTable[k].label, files[i].relocTable[j].label)) {
-                                if (files[i].symbolTable[k].location == 'T') {
-                                    temp += files[i].textStartingLine;
-                                }
-                                break;
-                            }
-                        }
                         files[i].data[files[i].relocTable[j].offset] = temp;
                     }
                 } else {
-                    // Local .fill handling
+                    // Handle local labels in data section
                     int temp = files[i].data[files[i].relocTable[j].offset];
-                    int sum = files[i].textStartingLine;
-                    if (temp >= files[i].textSize) {
-                        sum = files[i].dataStartingLine + (temp - files[i].textSize);
+                    int sum = 0;
+                    for (int k = i; k >= 0; k--) {
+                        if (k != i) {
+                            if (temp >= files[i].textSize) {
+                                sum += files[k].dataSize + files[k].textSize;
+                            } else {
+                                sum += files[k].textSize;
+                            }
+                        }
                     }
-                    files[i].data[files[i].relocTable[j].offset] = sum;
+                    files[i].data[files[i].relocTable[j].offset] = sum + temp;
                 }
             }
         }
@@ -323,7 +299,7 @@ int findGlobals(FileData files[MAXFILES], int exception, int size, char *input) 
         for (int j = 0; j < files[i].symbolTableSize; j++) {
             if (!strcmp(files[i].symbolTable[j].label, input)) {
                 if (files[i].symbolTable[j].location == 'T') {
-                    temp = files[i].symbolTable[j].offset;
+                    temp = files[i].symbolTable[j].offset + files[i].textStartingLine;
                 } else if (files[i].symbolTable[j].location == 'D') {
                     temp = files[i].symbolTable[j].offset + files[i].dataStartingLine;
                 } else if (files[i].symbolTable[j].location == 'U' && !strcmp("Stack", input)) {
@@ -347,14 +323,19 @@ void assignStarts(FileData files[MAXFILES], int size) {
     int sum = 0;
     // Calculate text segment starting positions
     for (int i = 0; i < size; i++) {
-        files[i].textStartingLine = sum;
-        sum += files[i].textSize;
+        if (i == 0) {
+            sum += files[i].textSize;
+        } else {
+            files[i].textStartingLine = sum;
+            sum += files[i].textSize;
+        }
     }
     
     // Calculate data segment starting positions
-    for (int i = 0; i < size; i++) {
+    files[0].dataStartingLine = sum;
+    for (int i = 1; i < size; i++) {
+        sum += files[i - 1].dataSize;
         files[i].dataStartingLine = sum;
-        sum += files[i].dataSize;
     }
 }
 
